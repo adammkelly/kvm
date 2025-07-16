@@ -3,54 +3,35 @@ package network
 import (
 	"fmt"
 	"net"
-	"sync"
 
 	"github.com/jetkvm/kvm/internal/confparser"
 	"github.com/jetkvm/kvm/internal/logging"
 	"github.com/jetkvm/kvm/internal/udhcpc"
-	"github.com/rs/zerolog"
 
 	"github.com/vishvananda/netlink"
 )
 
-type NetworkInterfaceState struct {
-	interfaceName string
-	interfaceUp   bool
-	ipv4Addr      *net.IP
-	ipv4Addresses []string
-	ipv6Addr      *net.IP
-	ipv6Addresses []IPv6Address
-	ipv6LinkLocal *net.IP
-	ntpAddresses  []*net.IP
-	macAddr       *net.HardwareAddr
+var GLOB_IF_LIST [1]*NetworkInterfaceState
 
-	l         *zerolog.Logger
-	stateLock sync.Mutex
-
-	config     *NetworkConfig
-	dhcpClient *udhcpc.DHCPClient
-
-	defaultHostname string
-	currentHostname string
-	currentFqdn     string
-
-	onStateChange  func(state *NetworkInterfaceState)
-	onInitialCheck func(state *NetworkInterfaceState)
-	cbConfigChange func(config *NetworkConfig)
-
-	checked bool
+func findNetworkInterface(if_name string) *NetworkInterfaceState {
+	for _, if_obj := range GLOB_IF_LIST {
+		if if_obj.interfaceName == if_name {
+			return if_obj
+		}
+	}
+	return nil
 }
 
-type NetworkInterfaceOptions struct {
-	InterfaceName     string
-	DhcpPidFile       string
-	Logger            *zerolog.Logger
-	DefaultHostname   string
-	OnStateChange     func(state *NetworkInterfaceState)
-	OnInitialCheck    func(state *NetworkInterfaceState)
-	OnDhcpLeaseChange func(lease *udhcpc.Lease)
-	OnConfigChange    func(config *NetworkConfig)
-	NetworkConfig     *NetworkConfig
+func parseIPMask(mask string) (net.IPMask, error) {
+	ip := net.ParseIP(mask)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address format for mask: %s", mask)
+	}
+	ipv4 := ip.To4()
+	if ipv4 == nil {
+		return nil, fmt.Errorf("mask %s is not an IPv4 address", mask)
+	}
+	return net.IPMask(ipv4), nil
 }
 
 func NewNetworkInterfaceState(opts *NetworkInterfaceOptions) (*NetworkInterfaceState, error) {
@@ -71,34 +52,69 @@ func NewNetworkInterfaceState(opts *NetworkInterfaceOptions) (*NetworkInterfaceS
 	s := &NetworkInterfaceState{
 		interfaceName:   opts.InterfaceName,
 		defaultHostname: opts.DefaultHostname,
-		stateLock:       sync.Mutex{},
 		l:               l,
 		onStateChange:   opts.OnStateChange,
 		onInitialCheck:  opts.OnInitialCheck,
 		cbConfigChange:  opts.OnConfigChange,
 		config:          opts.NetworkConfig,
 		ntpAddresses:    make([]*net.IP, 0),
+		Options:         opts,
 	}
+	GLOB_IF_LIST[0] = s
+
+	mode := opts.NetworkConfig.IPv4Mode.String
 
 	// create the dhcp client
-	dhcpClient := udhcpc.NewDHCPClient(&udhcpc.DHCPClientOptions{
-		InterfaceName: opts.InterfaceName,
-		PidFile:       opts.DhcpPidFile,
-		Logger:        l,
-		OnLeaseChange: func(lease *udhcpc.Lease) {
-			_, err := s.update()
-			if err != nil {
-				opts.Logger.Error().Err(err).Msg("failed to update network state")
-				return
-			}
-			_ = s.updateNtpServersFromLease(lease)
-			_ = s.setHostnameIfNotSame()
 
-			opts.OnDhcpLeaseChange(lease)
-		},
-	})
+	if mode == "dhcp" {
+		s.l.Info().Msg("DHCP UP")
+		dhcpClient := udhcpc.NewDHCPClient(&udhcpc.DHCPClientOptions{
+			InterfaceName: opts.InterfaceName,
+			PidFile:       opts.DhcpPidFile,
+			Logger:        l,
+			OnLeaseChange: func(lease *udhcpc.Lease) {
+				s.update()
+				//if err != nil {
+				//	opts.Logger.Error().Err(err).Msg("failed to update network state")
+				//	return
+				//}
+				s.updateNtpServersFromLease(lease)
+				s.setHostnameIfNotSame()
+				interf := findNetworkInterface(lease.Client.InterfaceName)
+				opts.OnDhcpLeaseChange(interf, lease)
 
-	s.dhcpClient = dhcpClient
+			},
+		})
+
+		s.l.Info().Msg("DHCP UP2")
+		s.DhcpClient = dhcpClient
+
+		mask := "255.255.248.0"
+		ipMask, err := parseIPMask(mask)
+		if err != nil {
+			fmt.Printf("Failed to parse IP mask: %v\n", err)
+			return s, err
+		}
+		length, _ := ipMask.Size()
+		fmt.Printf("Subnet mask is a /%d\n", length)
+	} else {
+		static_info := opts.NetworkConfig.IPv4Static
+		s.l.Info().Msg("STATIC TIME?!")
+
+		ipMask, err := parseIPMask(static_info.Netmask.String)
+		if err != nil {
+			fmt.Printf("Failed to parse IP mask: %v\n", err)
+			return s, err
+		}
+
+		pl, _ := ipMask.Size()
+		fmt.Printf("Subnet mask is a /%d\n", pl)
+		eth0, _ := netlink.LinkByName(opts.InterfaceName)
+		// netlink.ParseAddr()
+		ipAddress := fmt.Sprintf("%s/%d", static_info.Address.String, pl)
+		addr, _ := netlink.ParseAddr(ipAddress)
+		netlink.AddrAdd(eth0, addr)
+	}
 
 	return s, nil
 }
@@ -170,8 +186,7 @@ func (s *NetworkInterfaceState) MACString() string {
 }
 
 func (s *NetworkInterfaceState) update() (DhcpTargetState, error) {
-	s.stateLock.Lock()
-	defer s.stateLock.Unlock()
+	// Remove this lock by having the worker take care of all updates.
 
 	dhcpTargetState := DhcpTargetStateDoNothing
 
@@ -337,6 +352,7 @@ func (s *NetworkInterfaceState) update() (DhcpTargetState, error) {
 	} else if changed {
 		s.onStateChange(s)
 	}
+	s.l.Info().Msg(fmt.Sprintf("Default format: %v\n", s))
 
 	return dhcpTargetState, nil
 }
@@ -369,10 +385,10 @@ func (s *NetworkInterfaceState) CheckAndUpdateDhcp() error {
 	switch dhcpTargetState {
 	case DhcpTargetStateRenew:
 		s.l.Info().Msg("renewing DHCP lease")
-		_ = s.dhcpClient.Renew()
+		_ = s.DhcpClient.Renew()
 	case DhcpTargetStateRelease:
 		s.l.Info().Msg("releasing DHCP lease")
-		_ = s.dhcpClient.Release()
+		_ = s.DhcpClient.Release()
 	case DhcpTargetStateStart:
 		s.l.Warn().Msg("dhcpTargetStateStart not implemented")
 	case DhcpTargetStateStop:
@@ -384,5 +400,5 @@ func (s *NetworkInterfaceState) CheckAndUpdateDhcp() error {
 
 func (s *NetworkInterfaceState) onConfigChange(config *NetworkConfig) {
 	_ = s.setHostnameIfNotSame()
-	s.cbConfigChange(config)
+	s.cbConfigChange(s, config)
 }

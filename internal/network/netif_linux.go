@@ -28,7 +28,7 @@ func (s *NetworkInterfaceState) Run() error {
 	_ = s.setHostnameIfNotSame()
 
 	// run the dhcp client
-	go s.dhcpClient.Run() // nolint:errcheck
+	go s.DhcpClient.Run() // nolint:errcheck
 
 	if err := s.CheckAndUpdateDhcp(); err != nil {
 		return err

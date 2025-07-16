@@ -69,6 +69,8 @@ func (c *DHCPClient) getWatchPaths() []string {
 // Run starts the DHCP client and watches the lease file for changes.
 // this isn't a blocking call, and the lease file is reloaded when a change is detected.
 func (c *DHCPClient) Run() error {
+
+	c.logger.Info().Msg("START FILE DHCP?")
 	err := c.loadLeaseFile()
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -126,7 +128,9 @@ func (c *DHCPClient) Run() error {
 	// }
 
 	// block the goroutine until the lease file is updated
-	<-make(chan struct{})
+	c.logger.Info().Msg("Blocking?")
+	// <-make(chan struct{})
+	c.logger.Info().Msg("Not blobking?")
 
 	return nil
 }
@@ -182,6 +186,7 @@ func (c *DHCPClient) loadLeaseFile() error {
 			Msg("current dhcp lease expiry time calculated")
 	}
 
+	lease.Client = c
 	c.onLeaseChange(lease)
 
 	c.logger.Info().

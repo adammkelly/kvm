@@ -109,7 +109,7 @@ func (s *NetworkInterfaceState) GetDomain() string {
 	domain := ToValidDomain(s.config.Domain.String)
 
 	if domain == "" {
-		lease := s.dhcpClient.GetLease()
+		lease := s.DhcpClient.GetLease()
 		if lease != nil && lease.Domain != "" {
 			domain = ToValidDomain(lease.Domain)
 		}

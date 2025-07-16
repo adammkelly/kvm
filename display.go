@@ -221,11 +221,17 @@ func requestDisplayUpdate(shouldWakeDisplay bool) {
 }
 
 func waitCtrlAndRequestDisplayUpdate(shouldWakeDisplay bool) {
+	displayLogger.Info().Msg("waitCtrlAndRequestDisplayUpdate start")
 	waitDisplayUpdate.Lock()
+	displayLogger.Info().Msg("waitCtrlAndRequestDisplayUpdate start1")
 	defer waitDisplayUpdate.Unlock()
+	displayLogger.Info().Msg("waitCtrlAndRequestDisplayUpdate start2")
 
 	waitCtrlClientConnected()
+	displayLogger.Info().Msg("waitCtrlAndRequestDisplayUpdate start3")
 	requestDisplayUpdate(shouldWakeDisplay)
+
+	displayLogger.Info().Msg("waitCtrlAndRequestDisplayUpdate FIN")
 }
 
 func updateStaticContents() {

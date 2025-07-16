@@ -84,7 +84,7 @@ func (s *NetworkInterfaceState) RpcGetNetworkState() RpcNetworkState {
 		IPv6LinkLocal: s.IPv6LinkLocalAddress(),
 		IPv4Addresses: s.ipv4Addresses,
 		IPv6Addresses: ipv6Addresses,
-		DHCPLease:     s.dhcpClient.GetLease(),
+		DHCPLease:     s.DhcpClient.GetLease(),
 	}
 }
 
@@ -118,9 +118,9 @@ func (s *NetworkInterfaceState) RpcSetNetworkSettings(settings RpcNetworkSetting
 }
 
 func (s *NetworkInterfaceState) RpcRenewDHCPLease() error {
-	if s.dhcpClient == nil {
+	if s.DhcpClient == nil {
 		return fmt.Errorf("dhcp client not initialized")
 	}
 
-	return s.dhcpClient.Renew()
+	return s.DhcpClient.Renew()
 }

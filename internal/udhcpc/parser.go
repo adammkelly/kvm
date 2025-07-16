@@ -46,6 +46,7 @@ type Lease struct {
 	Uptime            time.Duration `env:"uptime" json:"uptime,omitempty"`             // The uptime of the device when the lease was obtained, in seconds
 	LeaseExpiry       *time.Time    `json:"lease_expiry,omitempty"`                    // The expiry time of the lease
 	isEmpty           map[string]bool
+	Client            *DHCPClient
 }
 
 func (l *Lease) setIsEmpty(m map[string]bool) {

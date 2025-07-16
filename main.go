@@ -44,10 +44,12 @@ func Main() {
 		Msg("loaded Root CA certificates")
 
 	// Initialize network
+	logger.Error().Err(err).Msg("********* AMK NETWORK INIT **********")
 	if err := initNetwork(); err != nil {
 		logger.Error().Err(err).Msg("failed to initialize network")
 		os.Exit(1)
 	}
+	logger.Error().Err(err).Msg("********* AMK NETWORK INIT EXIT **********")
 
 	// Initialize time sync
 	initTimeSync()
@@ -59,8 +61,10 @@ func Main() {
 		os.Exit(1)
 	}
 
+	logger.Error().Err(err).Msg("********* AMK SOCKET INIT **********")
 	// Initialize native ctrl socket server
 	StartNativeCtrlSocketServer()
+	logger.Error().Err(err).Msg("********* AMK SOCKET INIT END **********")
 
 	// Initialize native video socket server
 	StartNativeVideoSocketServer()
@@ -86,6 +90,7 @@ func Main() {
 	}
 	initJiggler()
 
+	logger.Error().Err(err).Msg("********* AMK DISPLAY INIT **********")
 	// initialize display
 	initDisplay()
 

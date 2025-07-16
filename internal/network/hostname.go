@@ -111,6 +111,7 @@ func SetHostname(hostname string, fqdn string) error {
 }
 
 func (s *NetworkInterfaceState) setHostnameIfNotSame() error {
+	s.l.Info().Msg("hostname set attempt")
 	hostname := s.GetHostname()
 	currentHostname, _ := os.Hostname()
 

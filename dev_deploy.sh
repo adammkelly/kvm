@@ -191,6 +191,7 @@ cd "${REMOTE_PATH}"
 chmod +x jetkvm_app_debug
 
 # Run the application in the background
+export LOG_TRACE_SCOPES="jetkvm,cloud,websocket,native,jsonrpc"
 PION_LOG_TRACE=${LOG_TRACE_SCOPES} ./jetkvm_app_debug | tee -a /tmp/jetkvm_app_debug.log
 EOF
 fi

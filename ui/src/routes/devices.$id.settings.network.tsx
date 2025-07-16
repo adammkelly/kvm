@@ -29,6 +29,7 @@ import AutoHeight from "../components/AutoHeight";
 import DhcpLeaseCard from "../components/DhcpLeaseCard";
 
 import { SettingsItem } from "./devices.$id.settings";
+import StaticIpCard from "@components/StaticIpCard";
 
 dayjs.extend(relativeTime);
 
@@ -375,38 +376,53 @@ export default function SettingsNetworkRoute() {
               onChange={e => handleIpv4ModeChange(e.target.value)}
               options={filterUnknown([
                 { value: "dhcp", label: "DHCP" },
-                // { value: "static", label: "Static" },
+                { value: "static", label: "Static" },
               ])}
             />
           </SettingsItem>
           <AutoHeight>
-            {!networkSettingsLoaded && !networkState?.dhcp_lease ? (
-              <GridCard>
-                <div className="p-4">
-                  <div className="space-y-4">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      DHCP Lease Information
-                    </h3>
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-4 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
-                      <div className="h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
-                      <div className="h-4 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
+            {networkSettings.ipv4_mode == "dhcp" ?
+              !networkSettingsLoaded && !networkState?.dhcp_lease ? (
+                <GridCard>
+                  <div className="p-4">
+                    <div className="space-y-4">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                        DHCP Lease Information
+                      </h3>
+                      <div className="animate-pulse space-y-3">
+                        <div className="h-4 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
+                        <div className="h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+                        <div className="h-4 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </GridCard>
-            ) : networkState?.dhcp_lease && networkState.dhcp_lease.ip ? (
-              <DhcpLeaseCard
-                networkState={networkState}
-                setShowRenewLeaseConfirm={setShowRenewLeaseConfirm}
-              />
-            ) : (
-              <EmptyCard
-                IconElm={LuEthernetPort}
-                headline="DHCP Information"
-                description="No DHCP lease information available"
-              />
-            )}
+                </GridCard>
+              ) : networkState?.dhcp_lease && networkState.dhcp_lease.ip ? (
+                <DhcpLeaseCard
+                  networkState={networkState}
+                  setShowRenewLeaseConfirm={setShowRenewLeaseConfirm}
+                />
+              ) : (
+                <EmptyCard
+                  IconElm={LuEthernetPort}
+                  headline="DHCP Information"
+                  description="No DHCP lease information available"
+                />
+              )
+            : networkSettings.ipv4_mode == "static" ?
+              (
+                <StaticIpCard
+                  networkState={networkState} />
+              )
+            :
+              (
+                <EmptyCard
+                  IconElm={LuEthernetPort}
+                  headline="Unknown IPv4 Mode selected"
+                  description="No information available"
+                />
+              )
+            }
           </AutoHeight>
         </div>
         <div className="space-y-4">
