@@ -10,6 +10,7 @@ import {
   mDNSMode,
   NetworkSettings,
   NetworkState,
+  StaticIPConfig,
   TimeSyncMode,
   useNetworkStateStore,
 } from "@/hooks/stores";
@@ -22,6 +23,7 @@ import { SettingsPageHeader } from "@/components/SettingsPageheader";
 import Fieldset from "@/components/Fieldset";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import notifications from "@/notifications";
+import StaticIpCard from "@components/StaticIpCard";
 
 import Ipv6NetworkCard from "../components/Ipv6NetworkCard";
 import EmptyCard from "../components/EmptyCard";
@@ -29,7 +31,6 @@ import AutoHeight from "../components/AutoHeight";
 import DhcpLeaseCard from "../components/DhcpLeaseCard";
 
 import { SettingsItem } from "./devices.$id.settings";
-import StaticIpCard from "@components/StaticIpCard";
 
 dayjs.extend(relativeTime);
 
@@ -127,7 +128,10 @@ export default function SettingsNetworkRoute() {
 
   const setNetworkSettingsRemote = useCallback(
     (settings: NetworkSettings) => {
+      console.log(settings);
+      setNetworkSettings(settings);
       setNetworkSettingsLoaded(false);
+      console.log(networkSettings);
       send("setNetworkSettings", { settings }, resp => {
         if ("error" in resp) {
           notifications.error(
@@ -193,6 +197,10 @@ export default function SettingsNetworkRoute() {
 
   const handleDomainChange = (value: string) => {
     setNetworkSettings({ ...networkSettings, domain: value });
+  };
+
+  const handleIPStaticConfigChange = (value: StaticIPConfig) => {
+    setNetworkSettings({ ...networkSettings, ipv4_static: value });
   };
 
   const handleDomainOptionChange = (value: string) => {
@@ -412,7 +420,9 @@ export default function SettingsNetworkRoute() {
             : networkSettings.ipv4_mode == "static" ?
               (
                 <StaticIpCard
-                  networkState={networkState} />
+                  networkState={networkState}
+                  setStaticIPConfig={handleIPStaticConfigChange}
+                   />
               )
             :
               (

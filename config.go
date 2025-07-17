@@ -184,6 +184,9 @@ func LoadConfig() {
 		return
 	}
 
+	ssss := fmt.Sprintf("LOADED CONF: %v", loadedConfig.NetworkConfig)
+	networkLogger.Info().Msg(ssss)
+
 	// merge the user config with the default config
 	if loadedConfig.UsbConfig == nil {
 		loadedConfig.UsbConfig = defaultConfig.UsbConfig

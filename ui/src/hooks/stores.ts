@@ -711,11 +711,19 @@ export interface IPv6Address {
   scope: string;
 }
 
+export interface StaticIPConfig {
+  address: string;
+  netmask: string;
+  gateway: string;
+  dns: string[];
+}
+
 export interface NetworkState {
   interface_name?: string;
   mac_address?: string;
   ipv4?: string;
   ipv4_addresses?: string[];
+  ipv4_static?: StaticIPConfig;
   ipv6?: string;
   ipv6_addresses?: IPv6Address[];
   ipv6_link_local?: string;
@@ -749,6 +757,7 @@ export interface NetworkSettings {
   domain: string;
   http_proxy: string;
   ipv4_mode: IPv4Mode;
+  ipv4_static?: StaticIPConfig;
   ipv6_mode: IPv6Mode;
   lldp_mode: LLDPMode;
   lldp_tx_tlvs: string[];

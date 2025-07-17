@@ -24,7 +24,7 @@ type IPv4StaticConfig struct {
 	Address null.String `json:"address,omitempty" validate_type:"ipv4" required:"true"`
 	Netmask null.String `json:"netmask,omitempty" validate_type:"ipv4" required:"true"`
 	Gateway null.String `json:"gateway,omitempty" validate_type:"ipv4" required:"true"`
-	DNS     []string    `json:"dns,omitempty" validate_type:"ipv4" required:"true"`
+	DNS     []string    `json:"dns,omitempty" required:"true"`
 }
 
 type IPv6StaticConfig struct {
@@ -38,7 +38,7 @@ type NetworkConfig struct {
 	HTTPProxy null.String `json:"http_proxy,omitempty" validate_type:"proxy"`
 	Domain    null.String `json:"domain,omitempty" validate_type:"hostname"`
 
-	IPv4Mode   null.String       `json:"ipv4_mode,omitempty" one_of:"dhcp,static,disabled" default:"dhcp"`
+	IPv4Mode   null.String       `json:"ipv4_mode,omitempty" one_of:"dhcp,static,disabled"`
 	IPv4Static *IPv4StaticConfig `json:"ipv4_static,omitempty" required_if:"IPv4Mode=static"`
 
 	IPv6Mode   null.String       `json:"ipv6_mode,omitempty" one_of:"slaac,dhcpv6,slaac_and_dhcpv6,static,link_local,disabled" default:"slaac"`

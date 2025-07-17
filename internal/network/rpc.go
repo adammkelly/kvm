@@ -101,10 +101,16 @@ func (s *NetworkInterfaceState) RpcGetNetworkSettings() RpcNetworkSettings {
 func (s *NetworkInterfaceState) RpcSetNetworkSettings(settings RpcNetworkSettings) error {
 	currentSettings := s.config
 
+	sss := fmt.Sprintf("AMKKKKKKKKKKKKKKKKKK1 %s - %v", settings.NetworkConfig.IPv4Mode, settings.NetworkConfig)
+	s.l.Info().Msg(sss)
+
 	err := confparser.SetDefaultsAndValidate(&settings.NetworkConfig)
 	if err != nil {
 		return err
 	}
+
+	ssss := fmt.Sprintf("AMKKKKKKKKKKKKKKKKKK2 %s - %v", settings.NetworkConfig.IPv4Mode, settings.NetworkConfig)
+	s.l.Info().Msg(ssss)
 
 	if IsSame(currentSettings, settings.NetworkConfig) {
 		// no changes, do nothing
@@ -112,7 +118,12 @@ func (s *NetworkInterfaceState) RpcSetNetworkSettings(settings RpcNetworkSetting
 	}
 
 	s.config = &settings.NetworkConfig
-	s.onConfigChange(s.config)
+
+	ssss1 := fmt.Sprintf("AMKKKKKKKKKKKKKKKKKK3 %s - %v", settings.NetworkConfig.IPv4Mode, settings.NetworkConfig)
+	s.l.Info().Msg(ssss1)
+
+	ssss2 := fmt.Sprintf("AMKKKKKKKKKKKKKKKKKK4 %s - %v", s.config.IPv4Mode, s.config)
+	s.l.Info().Msg(ssss2)
 
 	return nil
 }

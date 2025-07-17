@@ -54,8 +54,6 @@ func NewNetworkInterfaceState(opts *NetworkInterfaceOptions) (*NetworkInterfaceS
 		defaultHostname: opts.DefaultHostname,
 		l:               l,
 		onStateChange:   opts.OnStateChange,
-		onInitialCheck:  opts.OnInitialCheck,
-		cbConfigChange:  opts.OnConfigChange,
 		config:          opts.NetworkConfig,
 		ntpAddresses:    make([]*net.IP, 0),
 		Options:         opts,
@@ -85,18 +83,9 @@ func NewNetworkInterfaceState(opts *NetworkInterfaceOptions) (*NetworkInterfaceS
 
 			},
 		})
-
-		s.l.Info().Msg("DHCP UP2")
 		s.DhcpClient = dhcpClient
 
-		mask := "255.255.248.0"
-		ipMask, err := parseIPMask(mask)
-		if err != nil {
-			fmt.Printf("Failed to parse IP mask: %v\n", err)
-			return s, err
-		}
-		length, _ := ipMask.Size()
-		fmt.Printf("Subnet mask is a /%d\n", length)
+		s.l.Info().Msg("DHCP UP2")
 	} else {
 		static_info := opts.NetworkConfig.IPv4Static
 		s.l.Info().Msg("STATIC TIME?!")
@@ -117,6 +106,18 @@ func NewNetworkInterfaceState(opts *NetworkInterfaceOptions) (*NetworkInterfaceS
 	}
 
 	return s, nil
+}
+
+func (s *NetworkInterfaceState) Close() {
+
+	mode := s.config.IPv4Mode.String
+
+	// create the dhcp client
+
+	if mode == "dhcp" {
+		s.DhcpClient = nil
+	}
+	GLOB_IF_LIST[0] = nil
 }
 
 func (s *NetworkInterfaceState) IsUp() bool {
@@ -185,6 +186,87 @@ func (s *NetworkInterfaceState) MACString() string {
 	return s.macAddr.String()
 }
 
+func (s *NetworkInterfaceState) hasInterfaceStateChanged(iface netlink.Link) (bool, bool) {
+	// detect if the interface status changed
+	var changed bool
+	attrs := iface.Attrs()
+	state := attrs.OperState
+	newInterfaceUp := state == netlink.OperUp
+
+	// check if the interface is coming up
+	interfaceGoingUp := !s.interfaceUp && newInterfaceUp
+
+	if s.interfaceUp != newInterfaceUp {
+		s.interfaceUp = newInterfaceUp
+		changed = true
+	}
+
+	return changed, interfaceGoingUp
+}
+
+func (s *NetworkInterfaceState) hasIpv4AddressChanged(ipv4Addresses []net.IP) bool {
+	// detect if the interface status changed
+	var changed bool
+	if len(ipv4Addresses) > 0 {
+		// compare the addresses to see if there's a change
+		if s.ipv4Addr == nil || s.ipv4Addr.String() != ipv4Addresses[0].String() {
+			scopedLogger := s.l.With().Str("ipv4", ipv4Addresses[0].String()).Logger()
+			if s.ipv4Addr != nil {
+				scopedLogger.Info().
+					Str("old_ipv4", s.ipv4Addr.String()).
+					Msg("IPv4 address changed")
+			} else {
+				scopedLogger.Info().Msg("IPv4 address found")
+			}
+			s.ipv4Addr = &ipv4Addresses[0]
+			changed = true
+		}
+	}
+
+	return changed
+}
+
+func (s *NetworkInterfaceState) hasIpv6LinkLocalChanged(ipv6LinkLocal *net.IP) bool {
+	// detect if the interface status changed
+	var changed bool
+	if s.ipv6LinkLocal == nil || s.ipv6LinkLocal.String() != ipv6LinkLocal.String() {
+		scopedLogger := s.l.With().Str("ipv6", ipv6LinkLocal.String()).Logger()
+		if s.ipv6LinkLocal != nil {
+			scopedLogger.Info().
+				Str("old_ipv6", s.ipv6LinkLocal.String()).
+				Msg("IPv6 link local address changed")
+		} else {
+			scopedLogger.Info().Msg("IPv6 link local address found")
+		}
+		s.ipv6LinkLocal = ipv6LinkLocal
+		changed = true
+	}
+
+	return changed
+}
+
+func (s *NetworkInterfaceState) hasIpv6AddressChanged(ipv6Addresses []IPv6Address) bool {
+	// detect if the interface status changed
+	var changed bool
+	if len(ipv6Addresses) > 0 {
+		// compare the addresses to see if there's a change
+		if s.ipv6Addr == nil || s.ipv6Addr.String() != ipv6Addresses[0].Address.String() {
+			scopedLogger := s.l.With().Str("ipv6", ipv6Addresses[0].Address.String()).Logger()
+			if s.ipv6Addr != nil {
+				scopedLogger.Info().
+					Str("old_ipv6", s.ipv6Addr.String()).
+					Msg("IPv6 address changed")
+			} else {
+				scopedLogger.Info().Msg("IPv6 address found")
+			}
+			s.ipv6Addr = &ipv6Addresses[0].Address
+			changed = true
+		}
+	}
+
+	return changed
+}
+
 func (s *NetworkInterfaceState) update() (DhcpTargetState, error) {
 	// Remove this lock by having the worker take care of all updates.
 
@@ -196,34 +278,24 @@ func (s *NetworkInterfaceState) update() (DhcpTargetState, error) {
 		return dhcpTargetState, err
 	}
 
-	// detect if the interface status changed
-	var changed bool
 	attrs := iface.Attrs()
-	state := attrs.OperState
-	newInterfaceUp := state == netlink.OperUp
 
-	// check if the interface is coming up
-	interfaceGoingUp := !s.interfaceUp && newInterfaceUp
-	interfaceGoingDown := s.interfaceUp && !newInterfaceUp
-
-	if s.interfaceUp != newInterfaceUp {
-		s.interfaceUp = newInterfaceUp
-		changed = true
-	}
+	// IF change
+	changed, interfaceGoingUp := s.hasInterfaceStateChanged(iface)
 
 	if changed {
 		if interfaceGoingUp {
 			s.l.Info().Msg("interface state transitioned to up")
 			dhcpTargetState = DhcpTargetStateRenew
-		} else if interfaceGoingDown {
+		} else {
 			s.l.Info().Msg("interface state transitioned to down")
 		}
 	}
-
 	// set the mac address
 	s.macAddr = &attrs.HardwareAddr
 
 	// get the ip addresses
+	// Gets both from ifconfig
 	addrs, err := netlinkAddrs(iface)
 	if err != nil {
 		return dhcpTargetState, logging.ErrorfL(s.l, "failed to get ip addresses", err)
@@ -240,7 +312,7 @@ func (s *NetworkInterfaceState) update() (DhcpTargetState, error) {
 	for _, addr := range addrs {
 		if addr.IP.To4() != nil {
 			scopedLogger := s.l.With().Str("ipv4", addr.IP.String()).Logger()
-			if interfaceGoingDown {
+			if !interfaceGoingUp {
 				// remove all IPv4 addresses from the interface.
 				scopedLogger.Info().Msg("state transitioned to down, removing IPv4 address")
 				err := netlink.AddrDel(iface, &addr)
@@ -266,7 +338,7 @@ func (s *NetworkInterfaceState) update() (DhcpTargetState, error) {
 				continue
 			}
 
-			if interfaceGoingDown {
+			if !interfaceGoingUp {
 				scopedLogger.Info().Msg("state transitioned to down, removing IPv6 address")
 				err := netlink.AddrDel(iface, &addr)
 				if err != nil {
@@ -285,71 +357,28 @@ func (s *NetworkInterfaceState) update() (DhcpTargetState, error) {
 		}
 	}
 
-	if len(ipv4Addresses) > 0 {
-		// compare the addresses to see if there's a change
-		if s.ipv4Addr == nil || s.ipv4Addr.String() != ipv4Addresses[0].String() {
-			scopedLogger := s.l.With().Str("ipv4", ipv4Addresses[0].String()).Logger()
-			if s.ipv4Addr != nil {
-				scopedLogger.Info().
-					Str("old_ipv4", s.ipv4Addr.String()).
-					Msg("IPv4 address changed")
-			} else {
-				scopedLogger.Info().Msg("IPv4 address found")
-			}
-			s.ipv4Addr = &ipv4Addresses[0]
-			changed = true
-		}
+	change_happened := s.hasIpv4AddressChanged(ipv4Addresses)
+	if change_happened {
+		changed = true
 	}
 	s.ipv4Addresses = ipv4AddressesString
 
 	if ipv6LinkLocal != nil {
-		if s.ipv6LinkLocal == nil || s.ipv6LinkLocal.String() != ipv6LinkLocal.String() {
-			scopedLogger := s.l.With().Str("ipv6", ipv6LinkLocal.String()).Logger()
-			if s.ipv6LinkLocal != nil {
-				scopedLogger.Info().
-					Str("old_ipv6", s.ipv6LinkLocal.String()).
-					Msg("IPv6 link local address changed")
-			} else {
-				scopedLogger.Info().Msg("IPv6 link local address found")
-			}
-			s.ipv6LinkLocal = ipv6LinkLocal
-			changed = true
-		}
+		change_happened = s.hasIpv6LinkLocalChanged(ipv6LinkLocal)
 	}
 	s.ipv6Addresses = ipv6Addresses
 
-	if len(ipv6Addresses) > 0 {
-		// compare the addresses to see if there's a change
-		if s.ipv6Addr == nil || s.ipv6Addr.String() != ipv6Addresses[0].Address.String() {
-			scopedLogger := s.l.With().Str("ipv6", ipv6Addresses[0].Address.String()).Logger()
-			if s.ipv6Addr != nil {
-				scopedLogger.Info().
-					Str("old_ipv6", s.ipv6Addr.String()).
-					Msg("IPv6 address changed")
-			} else {
-				scopedLogger.Info().Msg("IPv6 address found")
-			}
-			s.ipv6Addr = &ipv6Addresses[0].Address
-			changed = true
-		}
+	if change_happened {
+		changed = true
 	}
 
-	// if it's the initial check, we'll set changed to false
-	initialCheck := !s.checked
-	if initialCheck {
-		s.checked = true
-		changed = false
-		if dhcpTargetState == DhcpTargetStateRenew {
-			// it's the initial check, we'll start the DHCP client
-			// dhcpTargetState = DhcpTargetStateStart
-			// TODO: manage DHCP client start/stop
-			dhcpTargetState = DhcpTargetStateDoNothing
-		}
+	change_happened = s.hasIpv6AddressChanged(ipv6Addresses)
+
+	if change_happened {
+		changed = true
 	}
 
-	if initialCheck {
-		s.onInitialCheck(s)
-	} else if changed {
+	if changed {
 		s.onStateChange(s)
 	}
 	s.l.Info().Msg(fmt.Sprintf("Default format: %v\n", s))
@@ -396,9 +425,4 @@ func (s *NetworkInterfaceState) CheckAndUpdateDhcp() error {
 	}
 
 	return nil
-}
-
-func (s *NetworkInterfaceState) onConfigChange(config *NetworkConfig) {
-	_ = s.setHostnameIfNotSame()
-	s.cbConfigChange(s, config)
 }

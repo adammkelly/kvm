@@ -1,70 +1,107 @@
 
-import { GridCard } from "@/components/Card";
+import { useState } from "react";
+
+import { Button } from "@components/Button";
 import { InputFieldWithLabel } from "@/components/InputField";
-import Fieldset from "@/components/Fieldset";
 import { NetworkState } from "@/hooks/stores";
 
-const ipv4_static = {
+
+
+export interface StaticIPConfig {
+  address: string;
+  netmask: string;
+  gateway: string;
+  dns: string[];
+}
+
+export default function StaticIpCard({
+  networkState,
+  setStaticIPConfig
+}: {
+  networkState: NetworkState;
+  setStaticIPConfig: (value: StaticIPConfig) => void;
+
+}) {
+  
+
+const [staticIPConfig, setipv4staticState] = useState<StaticIPConfig>({
   address: "",
   netmask: "",
   gateway: "",
   dns: []
-}
+});
 
-export default function StaticIpCard({
-  networkState
-}: {
-  networkState: NetworkState;
-}) {
+
+const handleAddressChange = (value: string) => {
+  setipv4staticState({ ...staticIPConfig, address: value });
+};
+
+const handleNetmaskChange = (value: string) => {
+  setipv4staticState({ ...staticIPConfig, netmask: value });
+};
+
+const handleGatewayChange = (value: string) => {
+  setipv4staticState({ ...staticIPConfig, gateway: value });
+};
+
+const handleDNSChange = (value: string) => {
+  setipv4staticState({ ...staticIPConfig, dns: [value] });
+};
+
+const _setNetworkSettings = () => {
+  setStaticIPConfig(staticIPConfig)
+};
+
+
+console.log(networkState)
+
   return (
-    <>
-    
-    {console.log(networkState)}
-    <GridCard>
-      <div className="animate-fadeIn p-4 opacity-0 animation-duration-500 text-black dark:text-white">
-        <div className="space-y-3">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">
-            Static IP Information
-          </h3>
-
-          <div className="flex gap-x-6 gap-y-2">
-            <div className="space-y-4">
-              <Fieldset>
-                <InputFieldWithLabel
-                  type="text"
-                  label="Macro Name"
-                  placeholder="Macro Name"
-                  value="test"
-                  onChange={e => { ipv4_static.address = e.target.value}}
-                />
-              </Fieldset>
-            </div>
-            <div className="space-y-4">
-              <Fieldset>
-                <InputFieldWithLabel
-                  type="text"
-                  label="Macro Name"
-                  placeholder="Macro Name"
-                  value="test"
-                  onChange={e => { ipv4_static.netmask = e.target.value}}
-                />
-              </Fieldset>
-            </div>
-            <div className="space-y-4">
-              <Fieldset>
-                <InputFieldWithLabel
-                  type="text"
-                  label="Macro Name"
-                  placeholder="Macro Name"
-                  value="test"
-                  onChange={e => { ipv4_static.gateway = e.target.value}}
-                />
-              </Fieldset>
-            </div>
-          </div>
-        </div>
+    <div className="">
+      <div className="grid grid-cols-2 gap-4">
+        <InputFieldWithLabel
+          required
+          label="Address"
+          placeholder="Enter Address"
+          defaultValue={staticIPConfig?.address}
+          onChange={e => handleAddressChange(e.target.value)}
+        />
       </div>
-    </GridCard>
-    </>
+      <div className="grid grid-cols-2 gap-4">
+        <InputFieldWithLabel
+          required
+          label="Netmask"
+          placeholder="Enter Netmask"
+          defaultValue={staticIPConfig?.netmask}
+          onChange={e => handleNetmaskChange(e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <InputFieldWithLabel
+          required
+          label="Gateway"
+          placeholder="Enter Gateway"
+          defaultValue={staticIPConfig?.gateway}
+          onChange={e => handleGatewayChange(e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <InputFieldWithLabel
+          required
+          label="DNS"
+          placeholder="Enter DNS"
+          defaultValue={staticIPConfig?.dns[0]}
+          onChange={e => handleDNSChange(e.target.value)}
+        />
+      </div>
+      <div className="mt-6 flex gap-x-2">
+        <Button
+          loading={false}
+          size="SM"
+          theme="primary"
+          text="Update USB Identifiers"
+          onClick={() => _setNetworkSettings()}
+        />
+      </div>
+    </div>
   );
 }

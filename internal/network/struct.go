@@ -28,11 +28,7 @@ type NetworkInterfaceState struct {
 	currentHostname string
 	currentFqdn     string
 
-	onStateChange  func(state *NetworkInterfaceState)
-	onInitialCheck func(state *NetworkInterfaceState)
-	cbConfigChange func(state *NetworkInterfaceState, config *NetworkConfig)
-
-	checked bool
+	onStateChange func(state *NetworkInterfaceState)
 }
 
 type NetworkInterfaceOptions struct {
@@ -42,9 +38,7 @@ type NetworkInterfaceOptions struct {
 	DefaultHostname   string
 	EventQueue        chan NetworkEvent
 	OnStateChange     func(state *NetworkInterfaceState)
-	OnInitialCheck    func(state *NetworkInterfaceState)
 	OnDhcpLeaseChange func(state *NetworkInterfaceState, lease *udhcpc.Lease)
-	OnConfigChange    func(state *NetworkInterfaceState, config *NetworkConfig)
 	NetworkConfig     *NetworkConfig
 }
 

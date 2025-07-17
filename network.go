@@ -77,11 +77,6 @@ func interfaceModeDHCP(queue chan network.NetworkEvent) (*network.NetworkInterfa
 			c := state.Options.EventQueue
 			c <- network.NetworkEvent{EventType: network.EventTypeNetworkInterfaceStateChange, State: state}
 		},
-		OnInitialCheck: func(state *network.NetworkInterfaceState) {
-			networkStateChanged()
-			c := state.Options.EventQueue
-			c <- network.NetworkEvent{EventType: network.EventTypeNetworkInterfaceStateChange, State: state}
-		},
 		OnDhcpLeaseChange: func(state *network.NetworkInterfaceState, lease *udhcpc.Lease) {
 			c := state.Options.EventQueue
 			c <- network.NetworkEvent{EventType: network.EventTypeNetworkInterfaceStateChange, State: state}
@@ -92,10 +87,6 @@ func interfaceModeDHCP(queue chan network.NetworkEvent) (*network.NetworkInterfa
 			}
 
 			writeJSONRPCEvent("networkState", networkState.RpcGetNetworkState(), currentSession)
-		},
-		OnConfigChange: func(state *network.NetworkInterfaceState, networkConfig *network.NetworkConfig) {
-			config.NetworkConfig = networkConfig
-			networkStateChanged()
 		},
 	})
 
@@ -131,6 +122,8 @@ func initNetwork() error {
 	mode := config.NetworkConfig.IPv4Mode.String
 	sss := fmt.Sprintf("AMKKKKKKKKKKKKKKKKKK - %s", mode)
 	networkLogger.Info().Msg(sss)
+	ssss := fmt.Sprintf("%v", config.NetworkConfig)
+	networkLogger.Info().Msg(ssss)
 	cc := make(chan network.NetworkEvent)
 
 	var err error
@@ -170,6 +163,9 @@ func rpcGetNetworkSettings() network.RpcNetworkSettings {
 
 func rpcSetNetworkSettings(settings network.RpcNetworkSettings) (*network.RpcNetworkSettings, error) {
 	s := networkState.RpcSetNetworkSettings(settings)
+
+	sss := fmt.Sprintf("AMKKKKKKKKKKKKKKKKKK - %v", settings)
+	networkLogger.Info().Msg(sss)
 	if s != nil {
 		return nil, s
 	}
@@ -177,6 +173,16 @@ func rpcSetNetworkSettings(settings network.RpcNetworkSettings) (*network.RpcNet
 	if err := SaveConfig(); err != nil {
 		return nil, err
 	}
+	networkState.Close()
+	networkState = nil
+	config = nil
+
+	LoadConfig()
+
+	ssss := fmt.Sprintf("AMKKKKKKKKKKKKKKKKKK - %v", config.NetworkConfig)
+	networkLogger.Info().Msg(ssss)
+
+	initNetwork()
 
 	return &network.RpcNetworkSettings{NetworkConfig: *config.NetworkConfig}, nil
 }
